@@ -1,2 +1,34 @@
-# mchose-ace68-air-signalrgb
-迈从 Ace 68 Air 超竞版 的 SignalRGB 适配插件。A customized, low-latency SignalRGB plugin for the MCHOSE Ace 68 Air-III keyboard.
+# SignalRGB Plugin for MCHOSE Ace 68 Air-III
+
+本仓库包含 **迈从 (MCHOSE) Ace 68 Air 超竞版** 机械键盘的 SignalRGB 自定义灯效插件。该插件基于社区开源项目的基础协议框架开发，并针对该型号进行了全键位物理映射校准与传输性能优化。
+
+## 特性
+
+* **全键位独立映射**：完全对齐 Ace 68 Air-III 的物理键位布局。
+* **内存优化**：采用全局预分配缓冲区，避免在 `Render` 循环中频繁创建数组，消除 JS 引擎垃圾回收（GC）引起的微卡顿。
+* **低延迟分包**：根据键盘最大物理 LED 索引（ID: 83），将单帧数据包从通用的 8 个精简至 5 个，减少 37.5% 的 USB 传输开销。
+* **丢包防护**：在分包写入间隙加入 1ms 硬件防抖延迟，解决高频刷新时部分键位闪烁的问题。
+
+## 安装方法
+
+1. 下载仓库中的 `MCHOSE_Ace_68_Air_III.js` 文件。
+2. 将该文件复制到 SignalRGB 的插件目录下：
+   `%userprofile%\Documents\WhirlwindFX\Plugins\`
+3. 重启 SignalRGB 软件即可在设备列表中识别。
+
+## 协议与技术细节说明
+
+在开发与测试过程中，记录了以下几个技术关键点，供后续维护或其他型号逆向参考：
+
+### 1. 校验和（Checksum）机制
+数据包的第 4 个字节（`packet[4]`）为标准的单字节累加校验和（LRC Checksum）。
+* **误判原因**：在发送纯色/全黑测试数据时，由于协议头中的偏移量（Offset）呈线性递增，导致该字节算出的结果也呈现出类似 Packet ID（`01, 02, 03...`）的伪装。
+* **修正方案**：接入 Canvas 动态色彩后触发协议失效，后通过变异测试确认其为数据校验位。目前已修正为对协议头及负载数据进行动态累加取低 8 位（`checksum & 0xFF`）。
+
+### 2. 数据包精简逻辑
+由于该键盘的最大硬件 LED ID 为 83，每个按键占用 3 字节（RGB），因此实际有效色彩数据区长度为 83 * 3 + 3 = 252 字节。
+单包 HID 负载能力为 54 字节，计算得出 5 个数据包（270 字节空间）即可完整覆盖所有灯区，故裁剪掉了后续 3 个无意义的空白包，从而进一步压低了传输延迟。
+
+## 致谢
+
+特别感谢 [Luk-Krn/mchose_ace68](https://github.com/Luk-Krn/mchose_ace68) 仓库提供的基础协议代码。本插件的协议大框架和初始化逻辑均受益于该项目的开源成果。
